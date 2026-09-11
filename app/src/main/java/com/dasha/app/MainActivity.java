@@ -27,13 +27,16 @@ public class MainActivity extends Activity {
 
     private Bitmap loadCover() {
         try {
-            InputStream in = getAssets().open("portada_dasha.b64");
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-            in.close();
-            byte[] img = Base64.decode(out.toByteArray(), Base64.DEFAULT);
+            ByteArrayOutputStream text = new ByteArrayOutputStream();
+            for (int i = 1; i <= 6; i++) {
+                String name = String.format("portada_%02d.b64", i);
+                InputStream in = getAssets().open(name);
+                byte[] buf = new byte[4096];
+                int n;
+                while ((n = in.read(buf)) != -1) text.write(buf, 0, n);
+                in.close();
+            }
+            byte[] img = Base64.decode(text.toByteArray(), Base64.DEFAULT);
             return BitmapFactory.decodeByteArray(img, 0, img.length);
         } catch (Exception e) {
             return null;
