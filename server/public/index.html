@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dasha - Asistente IA</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#222}body{margin:0;background:#fff7fb}.top{background:#d92f94;color:white;padding:14px 18px;font-weight:700}.wrap{max-width:820px;margin:auto;padding:16px}.card{background:white;border-radius:18px;padding:16px;box-shadow:0 4px 22px #0001;margin-bottom:14px}.hidden{display:none}.row{display:flex;gap:8px;flex-wrap:wrap}input,button{font:inherit;border-radius:12px;padding:12px;border:1px solid #ddd}input{flex:1;min-width:150px}button{background:#d92f94;color:white;border:0;font-weight:700}.secondary{background:#eee;color:#222}.danger{background:#b3261e}.messages{height:52vh;overflow:auto;padding:8px;background:#fff;border-radius:14px;border:1px solid #eee}.msg{margin:8px 0;padding:10px 12px;border-radius:14px;white-space:pre-wrap}.me{background:#ffe0f2;margin-left:15%}.ai{background:#f2f2f7;margin-right:15%}.small{font-size:12px;color:#666}.user{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;border-bottom:1px solid #eee;padding:8px 0}img.generated{max-width:100%;border-radius:14px;margin-top:8px}</style>
+</head>
+<body>
+<div class="top">Dasha · Tu asistente IA</div>
+<div class="wrap">
+<section id="login" class="card">
+<h2>Iniciar sesión</h2>
+<div class="row"><input id="lu" placeholder="Usuario"><input id="lp" type="password" placeholder="Contraseña"><button onclick="login()">Entrar</button></div>
+<p id="loginErr" class="small"></p>
+</section>
+<section id="app" class="hidden">
+<div class="card"><div class="row"><strong id="who"></strong><button class="secondary" onclick="logout()">Salir</button><button id="adminBtn" class="secondary hidden" onclick="toggleAdmin()">Administrar usuarios</button></div></div>
+<div class="card"><div id="messages" class="messages"></div><div class="row" style="margin-top:10px"><input id="prompt" placeholder="Escribe tu mensaje..." onkeydown="if(event.key==='Enter')sendChat()"><button onclick="sendChat()">Enviar</button><button class="secondary" onclick="makeImage()">Imagen</button></div><div id="status" class="small"></div></div>
+<div id="admin" class="card hidden"><h3>Usuarios</h3><div class="row"><input id="nu" placeholder="Nuevo usuario"><input id="np" type="password" placeholder="Contraseña"><input id="nl" type="number" value="30" placeholder="Límite diario"><button onclick="createUser()">Crear</button></div><div id="users"></div></div>
+</section>
+</div>
+<script>
+let token='',role='',username='';
+function api(path,opt={}){opt.headers={...(opt.headers||{}),'Content-Type':'application/json',...(token?{'Authorization':'Bearer '+token}:{})};return fetch(path,opt).then(async r=>{const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Error');return j})}
+async function login(){try{const j=await api('/api/login',{method:'POST',body:JSON.stringify({username:lu.value,password:lp.value})});token=j.token;role=j.role;username=j.username;login.classList.add('hidden');app.classList.remove('hidden');who.textContent=username+(role==='admin'?' · Administrador':'');if(role==='admin')adminBtn.classList.remove('hidden');add('ai','Hola, soy Dasha. ¿En qué te ayudo?')}catch(e){loginErr.textContent=e.message}}
+function logout(){token='';location.reload()}
+function add(cls,text,node){const d=document.createElement('div');d.className='msg '+cls;if(node)d.appendChild(node);else d.textContent=text;messages.appendChild(d);messages.scrollTop=messages.scrollHeight}
+async function sendChat(){const t=prompt.value.trim();if(!t)return;prompt.value='';add('me',t);status.textContent='Dasha está pensando...';try{const j=await api('/api/chat',{method:'POST',body:JSON.stringify({message:t})});add('ai',j.text)}catch(e){add('ai','Error: '+e.message)}finally{status.textContent=''}}
+async function makeImage(){const t=prompt.value.trim();if(!t){status.textContent='Escribe una descripción para la imagen.';return}add('me','Crear imagen: '+t);status.textContent='Generando imagen...';try{const j=await api('/api/image',{method:'POST',body:JSON.stringify({prompt:t})});const img=document.createElement('img');img.className='generated';img.alt='Imagen generada';img.src=j.b64?'data:image/png;base64,'+j.b64:j.url;add('ai','',img)}catch(e){add('ai','Error: '+e.message)}finally{status.textContent=''}}
+function toggleAdmin(){admin.classList.toggle('hidden');if(!admin.classList.contains('hidden'))loadUsers()}
+async function loadUsers(){try{const list=await api('/api/admin/users');users.innerHTML='';for(const u of list){const d=document.createElement('div');d.className='user';const label=document.createElement('div');label.innerHTML='<b>'+esc(u.username)+'</b><div class="small">Límite: '+u.dailyLimit+'/día · Usado: '+u.usedToday+' · '+(u.active?'Activo':'Bloqueado')+'</div>';const b=document.createElement('button');b.className='secondary';b.textContent=u.active?'Bloquear':'Activar';b.onclick=()=>patchUser(u.id,{active:!u.active});const x=document.createElement('button');x.className='danger';x.textContent='Eliminar';x.onclick=()=>deleteUser(u.id);d.append(label,b,x);users.appendChild(d)}}catch(e){users.textContent=e.message}}
+async function createUser(){try{await api('/api/admin/users',{method:'POST',body:JSON.stringify({username:nu.value,password:np.value,dailyLimit:Number(nl.value)||30})});nu.value='';np.value='';loadUsers()}catch(e){alert(e.message)}}
+async function patchUser(id,data){try{await api('/api/admin/users/'+id,{method:'PATCH',body:JSON.stringify(data)});loadUsers()}catch(e){alert(e.message)}}
+async function deleteUser(id){if(!confirm('¿Eliminar usuario?'))return;try{await api('/api/admin/users/'+id,{method:'DELETE'});loadUsers()}catch(e){alert(e.message)}}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+</script>
+</body></html>
