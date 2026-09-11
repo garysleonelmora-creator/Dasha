@@ -28,8 +28,8 @@ public class MainActivity extends Activity {
     private Bitmap loadCover() {
         try {
             ByteArrayOutputStream text = new ByteArrayOutputStream();
-            for (int i = 1; i <= 6; i++) {
-                String name = String.format("portada_%02d.b64", i);
+            String[] names = {"portadaA.b64", "portadaB.b64"};
+            for (String name : names) {
                 InputStream in = getAssets().open(name);
                 byte[] buf = new byte[4096];
                 int n;
